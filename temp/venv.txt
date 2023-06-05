@@ -1,0 +1,36 @@
+virtualenv --python C:\Users\KonuTech\AppData\Local\Programs\Python\Python39\python.exe .venv
+Set-ExecutionPolicy Unrestricted -Scope Process
+.\.venv\Scripts\activate
+Linux: source .\.venv\Scripts\activate
+pip list
+
+mlflow ui --backend-store-uri sqlite:///mlflow.db
+mlflow ui --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./artifacts_local
+http://127.0.0.1:5000
+
+
+HM 2
+python ./homework/preprocess_data.py --raw_data_path inputs --dest_path outputs
+python ./homework/train.py --data_path outputs
+python ./homework/hpo.py
+python ./homework/register_model.py
+
+prefect server start
+prefect project init
+
+# command has to be inline with deployment.yaml and a name of 'last' function in orchestrate.py
+prefect deploy 3.4/orchestrate.py:test_flow -n taxi_local_data -p zoompool
+prefect deploy 3.4/orchestrate.py:main_flow -n taxi_local_data -p zoompool
+prefect deploy 3.4/orchestrate.py:test2_flow -n taxi_local_data -p zoompool
+
+prefect worker start -p zoompool
+prefect worker start --pool zoompool --work-queue default
+
+
+(.venv) PS C:\Users\KonuTech\PycharmProjects\prefect-mlops-zoomcamp> prefect deploy 3.4/orchestrate.py:test2_flow -n taxi_local_data -p zoompool
+Deployment 'test2-flow/taxi_local_data' successfully created with id '6fe80854-b279-4452-b84c-43a61711f370'.
+
+To execute flow runs from this deployment, start a worker that pulls work from the 'zoompool' work pool
+(.venv) PS C:\Users\KonuTech\PycharmProjects\prefect-mlops-zoomcamp> prefect worker start -p zoompool
+Discovered worker type 'process' for work pool 'zoompool'.
+Worker 'ProcessWorker 99ef4933-a8bf-4ddb-a2f8-e838909f06ee' started!
