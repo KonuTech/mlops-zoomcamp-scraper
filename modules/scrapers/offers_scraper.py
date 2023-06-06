@@ -60,6 +60,12 @@ class ManufacturerScraper:
         soup = BeautifulSoup(response.text, features='lxml')
 
         car_links_section = soup.find('main', attrs={'data-testid': 'search-results'})
+
+        if car_links_section is None:
+            console_logger.warning(f'No car links found on page {i}')
+            file_logger.warning(f'No car links found on page {i}')
+            return []
+
         links = [x.find('a', href=True)['href'] for x in car_links_section.find_all('article')]
 
         console_logger.info(f'Found {len(links)} links')
@@ -95,7 +101,7 @@ class ManufacturerScraper:
             file_logger.error(f'Error {e} while searching for last_page_num')
             last_page_num = 1
 
-        last_page_num = min(last_page_num, 500)
+        last_page_num = min(last_page_num, 1000)
 
         console_logger.info(f'Manufacturer has: {last_page_num} subpages')
         file_logger.info(f'Manufacturer has: {last_page_num} subpages')

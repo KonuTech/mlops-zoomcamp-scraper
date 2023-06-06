@@ -102,7 +102,8 @@ class OfferScraper:
         :param links: a link to the offer
         :return: None
         """
-        with ThreadPoolExecutor(max_workers=min(self.max_threads, len(links))) as executor:
+        max_workers = max(self.max_threads, 1)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             rows = executor.map(self.download_url, links)
             self.manufacturer.extend(row for row in rows if row is not None)
 
