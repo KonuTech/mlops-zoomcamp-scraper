@@ -1,7 +1,7 @@
-import csv
 import os
 import time
 
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
@@ -17,7 +17,7 @@ OUTPUT_NAME = 'offers.csv'
 
 class ManufacturerScraper:
     """
-    Scraps data related to offers of cars from www.otomoto.pl
+    Scrapes data related to offers of cars from www.otomoto.pl
     Args:
         path_data_directory: path to a directory where data will be stored
         path_manufacturers_file: path to a file with names of manufacturers
@@ -35,10 +35,10 @@ class ManufacturerScraper:
     def get_manufacturers(self) -> list:
         """
         Gets a list of manufacturers from a static file
-        :return: a list of cars manufacturers names
+        :return: a list of car manufacturers' names
         """
         with open(self.path_manufacturers_file, 'r', encoding='utf-8') as file:
-            manufacturers = file.readlines()
+            manufacturers = [line.strip() for line in file]
 
         return manufacturers
 
@@ -50,13 +50,14 @@ class ManufacturerScraper:
         :param i:       web page number
         :return:        a list of links
         """
-        console_logger.info(f'Scrapping page: {i}')
-        file_logger.info(f'Scrapping page: {i}')
+        console_logger.info(f'Scraping page: {i}')
+        file_logger.info(f'Scraping page: {i}')
 
-        respond = requests.get(f'{path}?page={i}')
-        respond.raise_for_status()
+        with requests.Session() as session:
+            response = session.get(f'{path}?page={i}')
+            response.raise_for_status()
 
-        soup = BeautifulSoup(respond.text, features='lxml')
+        soup = BeautifulSoup(response.text, features='lxml')
 
         car_links_section = soup.find('main', attrs={'data-testid': 'search-results'})
         links = [x.find('a', href=True)['href'] for x in car_links_section.find_all('article')]
@@ -68,25 +69,26 @@ class ManufacturerScraper:
 
     def scrap_manufacturer(self, manufacturer: str) -> None:
         """
-        Scraps manufacturer data from otomoto.pl
+        Scrapes manufacturer data from otomoto.pl
         :param manufacturer:    car manufacturer name
         :return:                None
         """
         manufacturer = manufacturer.strip()
 
-        console_logger.info(f'Start of scrapping the manufacturer: {manufacturer}')
-        file_logger.info(f'Start of scrapping the manufacturer: {manufacturer}')
+        console_logger.info(f'Start of scraping the manufacturer: {manufacturer}')
+        file_logger.info(f'Start of scraping the manufacturer: {manufacturer}')
 
-        # clear a list of offers
+        # Clear the list of offers
         self.offers.clear_list()
 
         url = f'{URL_BASE}{manufacturer}'
 
         try:
-            respond = requests.get(url)
-            respond.raise_for_status()
+            with requests.Session() as session:
+                response = session.get(url)
+                response.raise_for_status()
 
-            soup = BeautifulSoup(respond.text, features='lxml')
+            soup = BeautifulSoup(response.text, features='lxml')
             last_page_num = int(soup.find_all('li', attrs={'data-testid': 'pagination-list-item'})[-1].text)
 
         except Exception as e:
@@ -106,25 +108,25 @@ class ManufacturerScraper:
 
             time.sleep(0.2)
 
-        # save a list of offers
+        # Save the list of offers
         self.offers.save_offers(manufacturer=manufacturer)
 
-        console_logger.info(f'End of scrapping the manufacturer: {manufacturer}')
-        file_logger.info(f'End of scrapping the manufacturer: {manufacturer}')
+        console_logger.info(f'End of scraping the manufacturer: {manufacturer}')
+        file_logger.info(f'End of scraping the manufacturer: {manufacturer}')
 
     def scrap_all_manufacturers(self) -> None:
         """
-        Loops over list of manufacturers names to scrap data for each one of them
+        Loops over the list of manufacturer names to scrape data for each one of them
         :return: None
         """
-        console_logger.info('Starting scrapping cars...')
-        file_logger.info('Starting scrapping cars...')
+        console_logger.info('Starting scraping cars...')
+        file_logger.info('Starting scraping cars...')
 
         for m, manufacturer in enumerate(self.manufacturers):
             self.scrap_manufacturer(manufacturer=manufacturer)
 
-        console_logger.info('End of scrapping manufacturers')
-        file_logger.info('End of scrapping manufacturers')
+        console_logger.info('End of scraping manufacturers')
+        file_logger.info('End of scraping manufacturers')
 
     def dump_data(self) -> None:
         """
@@ -143,17 +145,14 @@ class ManufacturerScraper:
 
         for f, filename in enumerate(filenames):
             try:
-                with open(filename, 'r', encoding='utf-8') as file:
-                    reader = csv.reader(file)
-                    data = list(reader)
-                    combined_data.extend(data)
+                data = pd.read_csv(filename)
+                combined_data.append(data)
 
             except Exception as e:
                 file_logger.error(f'Error {e} while searching for {filename}')
 
-        with open(os.path.join(self.path_data_directory, OUTPUT_NAME), 'w', encoding='utf-8', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(combined_data)
+        df = pd.concat(combined_data, ignore_index=True)
+        df.to_csv(os.path.join(self.path_data_directory, OUTPUT_NAME), index=False, encoding='utf-8')
 
         console_logger.info(f'Appended data saved as {OUTPUT_NAME}')
         file_logger.info(f'Appended data saved as {OUTPUT_NAME}')

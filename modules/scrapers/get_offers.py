@@ -36,9 +36,9 @@ class OfferScraper:
         :return: a list of column names
         """
         with open(self.path_header_file, 'r', encoding='utf-8') as file:
-            header = file.readlines()
+            header = [x.strip() for x in file.readlines()]
 
-        return [x.strip() for x in header]
+        return header
 
     def new_line(self, main_features: dict) -> dict:
         """
@@ -47,7 +47,6 @@ class OfferScraper:
         :return:                a key, value dictionary
         """
         row = {column: main_features.get(column, None) for column in self.header}
-
         return row
 
     def download_url(self, url_path: str) -> dict:
@@ -58,22 +57,20 @@ class OfferScraper:
         try:
             file_logger.info(f'Fetching {url_path}')
 
-            respond = requests.get(url_path)
-            respond.raise_for_status()
+            with requests.Session() as session:
+                response = session.get(url_path)
+                response.raise_for_status()
 
-            soup = BeautifulSoup(respond.text, features='lxml')
+            soup = BeautifulSoup(response.text, features='lxml')
 
             params = soup.find_all(class_='offer-params__item')
-
             batch = {
                 param.find('span', class_='offer-params__label').text.strip():
                     param.find('div', class_='offer-params__value').text.strip() for param in params
             }
 
             values = soup.find_all('li', class_='parameter-feature-item')
-
-            for v, value in enumerate(values):
-                batch[value.text.strip()] = 1
+            batch.update({value.text.strip(): 1 for value in values})
 
             price = ''.join(soup.find('span', class_='offer-price__number').text.strip().split()[:-1])
             batch['Cena'] = price
@@ -100,11 +97,8 @@ class OfferScraper:
         :return: None
         """
         with ThreadPoolExecutor(max_workers=min(self.max_threads, len(links))) as executor:
-            rows = [executor.submit(self.download_url, link) for link in links]
-            for r, row in enumerate(rows):
-                entry = row.result()
-                if entry is not None:
-                    self.manufacturer.append(entry)
+            rows = executor.map(self.download_url, links)
+            self.manufacturer.extend(row for row in rows if row is not None)
 
     def save_offers(self, manufacturer: str) -> None:
         """
@@ -116,7 +110,8 @@ class OfferScraper:
         file_logger.info(f'Found {len(self.manufacturer)} offers')
         console_logger.info(f'Found {len(self.manufacturer)} offers')
 
-        pd.DataFrame(self.manufacturer).to_csv(os.path.join(self.path_data_directory, f'{manufacturer.strip()}.csv'))
+        df = pd.DataFrame(self.manufacturer)
+        df.to_csv(os.path.join(self.path_data_directory, f'{manufacturer.strip()}.csv'), index=False)
 
         file_logger.info(f'Saved {manufacturer} offers')
 
