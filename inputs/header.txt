@@ -225,5 +225,5 @@ Zmiana biegów w kierownicy
 Cena
 Szczegóły ceny
 Waluta
-Url
+url_path
 id

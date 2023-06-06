@@ -1,5 +1,6 @@
 import os
 import time
+from hashlib import sha1
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
@@ -47,6 +48,7 @@ class OfferScraper:
         :return:                a key, value dictionary
         """
         row = {column: main_features.get(column, None) for column in self.header}
+
         return row
 
     def download_url(self, url_path: str) -> dict:
@@ -80,6 +82,10 @@ class OfferScraper:
 
             price_details = soup.find('span', class_='offer-price__details').text.strip()
             batch['Szczegóły ceny'] = price_details
+
+            batch['url_path'] = url_path
+
+            batch['id'] = sha1(url_path.lower().encode('utf-8')).hexdigest()
 
             batch = self.new_line(main_features=batch)
 
